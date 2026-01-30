@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>משחק 24 ריבועים</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: white;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 15px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .square {
+            aspect-ratio: 1;
+            border-radius: 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .square:hover:not(.completed) {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0,0,0,0.3);
+        }
+
+        .square.completed {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .square.completed::before {
+            content: '✕';
+            position: absolute;
+            font-size: 80px;
+            color: rgba(255,255,255,0.9);
+            font-weight: bold;
+            z-index: 10;
+        }
+
+        .square-content {
+            line-height: 1.4;
+            max-height: 100%;
+            overflow-y: auto;
+        }
+
+        .prize-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 10px;
+        }
+
+        .russian {
+            font-size: 14px;
+            direction: ltr;
+        }
+
+        @media (max-width: 768px) {
+            .game-container {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+            }
+            
+            .square {
+                font-size: 12px;
+                padding: 8px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .game-container {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8px;
+            }
+            
+            .square {
+                font-size: 10px;
+                padding: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 משחק 24 ריבועים 🎮</h1>
+    <div class="game-container" id="gameContainer"></div>
+
+    <script>
+        const questions = [
+            { he: "משהו שהצלחתי בו השנה", ru: "Что-то, в чём я преуспел в этом году" },
+            { he: "משהו שהשתפרתי בו השנה", ru: "Что-то, в чём я улучшился в этом году" },
+            { he: "משהו שעשיתי בשביל חבר", ru: "Что-то, что я сделал для друга" },
+            { he: "משהו שחבר עשה בשבילי", ru: "Что-то, что друг сделал для меня" },
+            { he: "משהו שאיש צוות עשה עבורי", ru: "Что-то, что сотрудник сделал для меня" },
+            { he: "אם היה לי צורך לפנות למישהו מהצוות, למי זה היה?", ru: "Если бы мне нужно было обратиться к кому-то из персонала, к кому бы это было?" },
+            { he: "אם הייתי יכול לקבוע חוק לבית ספר, איזה חוק זה היה?", ru: "Если бы я мог установить правило для школы, какое бы это было?" },
+            { he: "אם הייתי יכול להוסיף מאכל אחד לקפיטריה מה הוא היה?", ru: "Если бы я мог добавить одно блюдо в кафетерий, что бы это было?" },
+            { he: "אם הייתי יכול להחליף את הצלצול בשיר האהוב עלי, מה הוא היה?", ru: "Если бы я мог заменить звонок своей любимой песней, какой бы она была?" },
+            { he: "אם הייתי יכול לצרף חבר מכיתה אחרת שילמד איתי, מי זה היה?", ru: "Если бы я мог пригласить друга из другого класса учиться со мной, кто бы это был?" },
+            { he: "איזה מבוגר בבית ספר אוהב אותך?", ru: "Какой взрослый в школе любит тебя?" },
+            { he: "מה אתה מאחל לעצמך למחצית הבאה?", ru: "Что ты желаешь себе на следующую половину года?" },
+            { he: "הייתי רוצה שבבית הספר יהיו יותר...", ru: "Я бы хотел, чтобы в школе было больше..." },
+            { he: "מה המקצוע המועדף עליי?", ru: "Какой мой любимый предмет?" },
+            { he: "אם יש לי אפשרות לבחור שיעור אחד לצאת ממנו מה הייתי בוחר", ru: "Если бы у меня была возможность выбрать один урок, чтобы пропустить его, какой бы я выбрал" },
+            { he: "אם הייתי יכול לדבר עם מישהו שכבר מת, במי היית בוחר", ru: "Если бы я мог поговорить с кем-то, кто уже умер, кого бы я выбрал" },
+            { he: "משהו משמח אותי", ru: "Что-то, что делает меня счастливым" },
+            { he: "משהו על עצמי", ru: "Что-то о себе" },
+            { he: "משהו שהייתי רוצה להשתפר בו", ru: "Что-то, в чём я хотел бы улучшиться" },
+            { he: "משהו שלמדתי ואני זוכר", ru: "Что-то, чему я научился и помню" },
+            { he: "מקצוע שקשה לי בו", ru: "Предмет, который даётся мне трудно" },
+            { he: "פעילות בית ספרית שנהנתי בה", ru: "Школьная деятельность, которой я наслаждался" },
+            { he: "מבוגר שאני מעריך בבית ספר", ru: "Взрослый, которого я ценю в школе" }
+        ];
+
+        const prizes = [
+            { name: "שוקולד מקופלת", emoji: "🍫" },
+            { name: "שוקולד פסק זמן", emoji: "🍫" },
+            { name: "שוקולד כיף כף", emoji: "🍫" },
+            { name: "גומי קולה", emoji: "🍬" },
+            { name: "גומי פיצה", emoji: "🍬" },
+            { name: "גומי נחש", emoji: "🍬" }
+        ];
+
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F',
+            '#BB8FCE', '#85C1E2', '#F8B739', '#52BE80', '#EC7063', '#5DADE2',
+            '#AF7AC5', '#48C9B0', '#F39C12', '#2ECC71', '#E74C3C', '#3498DB',
+            '#9B59B6', '#1ABC9C', '#E67E22', '#27AE60', '#C0392B', '#2980B9'
+        ];
+
+        function shuffleArray(array) {
+            const newArray = [...array];
+            for (let i = newArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+            }
+            return newArray;
+        }
+
+        const shuffledQuestions = shuffleArray(questions);
+        const shuffledColors = shuffleArray(colors);
+
+        const gameState = Array(24).fill(null).map((_, index) => ({
+            clickCount: 0,
+            questionIndex: index % questions.length,
+            prizeIndex: index % prizes.length,
+            color: shuffledColors[index]
+        }));
+
+        function createSquares() {
+            const container = document.getElementById('gameContainer');
+            
+            for (let i = 0; i < 24; i++) {
+                const square = document.createElement('div');
+                square.className = 'square';
+                square.style.backgroundColor = gameState[i].color;
+                square.dataset.index = i;
+                
+                const content = document.createElement('div');
+                content.className = 'square-content';
+                content.textContent = (i + 1);
+                square.appendChild(content);
+                
+                square.addEventListener('click', () => handleSquareClick(i));
+                container.appendChild(square);
+            }
+        }
+
+        function handleSquareClick(index) {
+            const state = gameState[index];
+            
+            if (state.clickCount >= 3) return;
+            
+            state.clickCount++;
+            const square = document.querySelector(`[data-index="${index}"]`);
+            const content = square.querySelector('.square-content');
+            
+            if (state.clickCount === 1) {
+                const question = shuffledQuestions[state.questionIndex];
+                content.textContent = question.he;
+            } else if (state.clickCount === 2) {
+                const question = shuffledQuestions[state.questionIndex];
+                content.innerHTML = `<div class="russian">${question.ru}</div>`;
+            } else if (state.clickCount === 3) {
+                const prize = prizes[state.prizeIndex];
+                content.innerHTML = `<div style="font-size: 60px;">${prize.emoji}</div><div style="font-size: 14px; margin-top: 5px;">${prize.name}</div>`;
+                square.classList.add('completed');
+            }
+        }
+
+        createSquares();
+    </script>
+</body>
+</html>
